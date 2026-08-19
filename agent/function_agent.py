@@ -32,6 +32,11 @@ except ImportError:
 load_dotenv()
 
 BASE_DIR      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Memoire persistante SQLite
+sys.path.insert(0, os.path.join(BASE_DIR, 'agent'))
+from memory import AgentMemory
+memory = AgentMemory()
 BRIDGE_PATH   = os.path.join(BASE_DIR, "agent", "tools", "vmware_bridge.py")
 TFRUNNER_PATH = os.path.join(BASE_DIR, "agent", "tf_runner.py")
 YAML_PATH     = os.path.join(BASE_DIR, "input", "servers.yaml")
@@ -43,32 +48,26 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 # Prompt système de l'agent
 # ---------------------------------------------------------------------
 
-SYSTEM_PROMPT = """You are InfraAgent, an AI DevOps agent specialized in
-VMware Workstation Pro infrastructure automation.
+SYSTEM_PROMPT = """Tu es InfraAgent, un agent IA DevOps expert en
+automatisation d'infrastructure VMware Workstation Pro.
 
-You have tools to manage virtual machines. Use them autonomously
-to accomplish tasks requested by the operator.
+Tu disposes d'outils pour gérer des machines virtuelles.
+Tu dois les utiliser de façon autonome pour accomplir les tâches
+demandées par l'opérateur.
 
-IMPORTANT LANGUAGE RULES:
-- Always respond in English
-- Be tolerant of typos and abbreviations from the operator
-  (e.g. "cms" = "vms", "lsie" = "list", "craete" = "create")
-- When in doubt about a typo, pick the most logical interpretation
-  and execute it directly without asking
+RÈGLES DE GOUVERNANCE :
+- Nommage obligatoire : srv-{dev|staging|prod}-{role}-{index}
+  Exemples : srv-dev-web-01, srv-prod-db-02
+- CPU maximum : 8 vCPU
+- RAM maximum : 16 Go
+- Actions valides : create, destroy
 
-GOVERNANCE RULES:
-- Mandatory naming : srv-{dev|staging|prod}-{role}-{index}
-  Examples : srv-dev-web-01, srv-prod-db-02
-- Maximum CPU : 8 vCPU
-- Maximum RAM : 16 GB
-- Valid actions : create, destroy
-
-EXPECTED BEHAVIOR:
-- Use tools in the correct logical order
-- If a step fails, explain why and suggest a fix
-- Ask for confirmation ONLY before destructive actions (delete/destroy)
-- Be concise and professional
-- If a governance rule is violated, refuse and explain why
+COMPORTEMENT ATTENDU :
+- Utilise les outils dans le bon ordre logique
+- Si une étape échoue, explique pourquoi et propose une solution
+- Demande confirmation UNIQUEMENT avant une action destructive (delete)
+- Sois concis et professionnel dans tes réponses
+- Si une règle de gouvernance est violée, refuse et explique
 """
 
 # ---------------------------------------------------------------------
@@ -418,6 +417,8 @@ def executer_agent(instruction: str) -> None:
             # Exécuter le tool
             if nom_tool in TOOL_DISPATCH:
                 resultat = TOOL_DISPATCH[nom_tool](args)
+                succes = not resultat.startswith("[ERREUR]")
+                memory.sauvegarder_action(nom_tool, args, resultat[:500], succes)
             else:
                 resultat = f"[ERREUR] Tool inconnu : {nom_tool}"
 
@@ -466,6 +467,10 @@ def main():
         if instruction.lower() in ("exit", "quit", "q"):
             print("[INFO] Au revoir.")
             break
+
+        if instruction.lower() in ("history", "historique"):
+            memory.afficher_historique()
+            continue
 
         executer_agent(instruction)
 
