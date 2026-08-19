@@ -48,26 +48,36 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 # Prompt système de l'agent
 # ---------------------------------------------------------------------
 
-SYSTEM_PROMPT = """Tu es InfraAgent, un agent IA DevOps expert en
-automatisation d'infrastructure VMware Workstation Pro.
+SYSTEM_PROMPT = """You are InfraAgent, an AI DevOps agent specialized in
+VMware Workstation Pro infrastructure automation.
 
-Tu disposes d'outils pour gérer des machines virtuelles.
-Tu dois les utiliser de façon autonome pour accomplir les tâches
-demandées par l'opérateur.
+You have tools to manage virtual machines. Use them autonomously
+to accomplish tasks requested by the operator.
 
-RÈGLES DE GOUVERNANCE :
-- Nommage obligatoire : srv-{dev|staging|prod}-{role}-{index}
-  Exemples : srv-dev-web-01, srv-prod-db-02
-- CPU maximum : 8 vCPU
-- RAM maximum : 16 Go
-- Actions valides : create, destroy
+IMPORTANT LANGUAGE RULES:
+- Always respond in English
+- Be tolerant of typos and abbreviations from the operator
+- When in doubt about a typo, pick the most logical interpretation
+  and execute it directly without asking
 
-COMPORTEMENT ATTENDU :
-- Utilise les outils dans le bon ordre logique
-- Si une étape échoue, explique pourquoi et propose une solution
-- Demande confirmation UNIQUEMENT avant une action destructive (delete)
-- Sois concis et professionnel dans tes réponses
-- Si une règle de gouvernance est violée, refuse et explique
+GOVERNANCE RULES:
+- Mandatory naming : srv-{dev|staging|prod}-{role}-{index}
+  Examples : srv-dev-web-01, srv-prod-db-02
+- Maximum CPU : 8 vCPU
+- Maximum RAM : 16 GB
+- Valid actions : create, destroy
+
+SNAPSHOT RULES:
+- ALWAYS take an automatic snapshot before any delete operation
+- Use snapshot_vm tool before delete_vm
+- Name the snapshot with format: before-delete-YYYYMMDD-HHMMSS
+
+EXPECTED BEHAVIOR:
+- Use tools in the correct logical order
+- If a step fails, explain why and suggest a fix
+- Ask for confirmation ONLY before destructive actions (delete/destroy)
+- Be concise and professional
+- If a governance rule is violated, refuse and explain why
 """
 
 # ---------------------------------------------------------------------
@@ -170,6 +180,65 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "snapshot_vm",
+            "description": "Crée un snapshot (point de restauration) d'une VM existante.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "vm_name": {
+                        "type": "string",
+                        "description": "Nom de la VM"
+                    },
+                    "snapshot_name": {
+                        "type": "string",
+                        "description": "Nom du snapshot (optionnel, généré automatiquement si vide)"
+                    }
+                },
+                "required": ["vm_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_snapshots",
+            "description": "Liste tous les snapshots disponibles pour une VM.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "vm_name": {
+                        "type": "string",
+                        "description": "Nom de la VM"
+                    }
+                },
+                "required": ["vm_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "revert_snapshot",
+            "description": "Restaure une VM à un snapshot précédent.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "vm_name": {
+                        "type": "string",
+                        "description": "Nom de la VM"
+                    },
+                    "snapshot_name": {
+                        "type": "string",
+                        "description": "Nom du snapshot à restaurer"
+                    }
+                },
+                "required": ["vm_name", "snapshot_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "list_vms",
             "description": "Liste toutes les VMs connues dans l'inventaire local avec leur état.",
             "parameters": {
@@ -257,6 +326,22 @@ def tool_create_vm(vm_name: str, template_id: str) -> str:
     print(f"\n  [TOOL] create_vm({vm_name}, {template_id})")
     return _appeler_bridge(["create", template_id, vm_name])
 
+def tool_snapshot_vm(vm_name: str, snapshot_name: str = "") -> str:
+    print(f"\n  [TOOL] snapshot_vm({vm_name}, {snapshot_name})")
+    if not snapshot_name:
+        from datetime import datetime
+        snapshot_name = "auto-" + datetime.now().strftime("%Y%m%d-%H%M%S")
+    return _appeler_bridge(["snapshot", vm_name, snapshot_name])
+
+
+def tool_list_snapshots(vm_name: str) -> str:
+    print(f"\n  [TOOL] list_snapshots({vm_name})")
+    return _appeler_bridge(["list_snapshots", vm_name])
+
+
+def tool_revert_snapshot(vm_name: str, snapshot_name: str) -> str:
+    print(f"\n  [TOOL] revert_snapshot({vm_name}, {snapshot_name})")
+    return _appeler_bridge(["revert_snapshot", vm_name, snapshot_name])
 
 def tool_delete_vm(vm_name: str) -> str:
     print(f"\n  [TOOL] delete_vm({vm_name})")
@@ -332,6 +417,9 @@ def tool_confirm_action(action_description: str) -> str:
 # Dispatch table — associe le nom du tool à sa fonction Python
 TOOL_DISPATCH = {
     "create_vm":            lambda args: tool_create_vm(**args),
+    "snapshot_vm":          lambda args: tool_snapshot_vm(**args),
+    "list_snapshots":       lambda args: tool_list_snapshots(**args),
+    "revert_snapshot":      lambda args: tool_revert_snapshot(**args),
     "delete_vm":            lambda args: tool_delete_vm(**args),
     "start_vm":             lambda args: tool_start_vm(**args),
     "stop_vm":              lambda args: tool_stop_vm(**args),

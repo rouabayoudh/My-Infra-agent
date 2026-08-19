@@ -293,7 +293,33 @@ def stop(vm_name: str) -> None:
     _update_inventory(vm_name, status="PoweredOff")
     print(f"[OK] VM '{vm_name}' arrêtée.")
 
+def snapshot(vm_name: str, snapshot_name: str) -> None:
+    validate_vm_name(vm_name)
+    vmx_path = safe_vm_path(vm_name)
+    if not vmx_path.exists():
+        raise BridgeError(f"VM '{vm_name}' introuvable.")
+    _run_vmrun(["snapshot", str(vmx_path), snapshot_name])
+    _update_inventory(vm_name, last_snapshot=snapshot_name)
+    print(f"[OK] Snapshot '{snapshot_name}' cree pour '{vm_name}'.")
 
+
+def list_snapshots(vm_name: str) -> None:
+    validate_vm_name(vm_name)
+    vmx_path = safe_vm_path(vm_name)
+    if not vmx_path.exists():
+        raise BridgeError(f"VM '{vm_name}' introuvable.")
+    output = _run_vmrun(["listSnapshots", str(vmx_path)])
+    print(output)
+
+
+def revert_snapshot(vm_name: str, snapshot_name: str) -> None:
+    validate_vm_name(vm_name)
+    vmx_path = safe_vm_path(vm_name)
+    if not vmx_path.exists():
+        raise BridgeError(f"VM '{vm_name}' introuvable.")
+    _run_vmrun(["revertToSnapshot", str(vmx_path), snapshot_name])
+    print(f"[OK] VM '{vm_name}' restauree au snapshot '{snapshot_name}'.")
+    
 def list_all() -> None:
     """Liste l'inventaire local connu (pas uniquement les VMs actives)."""
     inv = _load_inventory()
@@ -336,6 +362,20 @@ def main() -> int:
             if len(sys.argv) != 3:
                 raise BridgeError("Usage: stop <vm_name>")
             stop(sys.argv[2])
+        elif command == "snapshot":
+            if len(sys.argv) != 4:
+                raise BridgeError("Usage: snapshot <vm_name> <snapshot_name>")
+            snapshot(sys.argv[2], sys.argv[3])
+
+        elif command == "list_snapshots":
+            if len(sys.argv) != 3:
+                raise BridgeError("Usage: list_snapshots <vm_name>")
+            list_snapshots(sys.argv[2])
+
+        elif command == "revert_snapshot":
+            if len(sys.argv) != 4:
+                raise BridgeError("Usage: revert_snapshot <vm_name> <snapshot_name>")
+            revert_snapshot(sys.argv[2], sys.argv[3])   
 
         elif command == "list":
             list_all()
