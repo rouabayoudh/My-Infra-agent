@@ -72,6 +72,13 @@ SNAPSHOT RULES:
 - Use snapshot_vm tool before delete_vm
 - Name the snapshot with format: before-delete-YYYYMMDD-HHMMSS
 
+MULTI-VM RULES:
+- If the operator asks for multiple VMs (e.g. "3 web servers"),
+  generate sequential names automatically: srv-dev-web-01, srv-dev-web-02, srv-dev-web-03
+- Call create_vm once per VM, in sequence
+- Index always on 2 digits: 01, 02, 03...
+- Confirm the count before creating if ambiguous
+
 EXPECTED BEHAVIOR:
 - Use tools in the correct logical order
 - If a step fails, explain why and suggest a fix
