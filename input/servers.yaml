@@ -1,0 +1,10 @@
+servers:
+  - name: srv-dev-web-01
+    action: create
+    cpu: 2
+    ram_gb: 4
+    disk_gb: 40
+    template: ubuntu-22.04
+    network: NAT
+    ip: 192.168.100.10
+    datastore: local-ssd

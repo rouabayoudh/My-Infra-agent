@@ -1,0 +1,25 @@
+# Environnement virtuel
+venv/
+
+# Clé API et secrets
+.env
+
+# Fichiers Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+
+# Inventaire local (spécifique à ta machine)
+agent/state/
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# PDF de test
+input/*.pdf

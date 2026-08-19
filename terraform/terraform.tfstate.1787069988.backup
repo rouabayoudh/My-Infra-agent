@@ -1,0 +1,41 @@
+{
+  "version": 4,
+  "terraform_version": "1.15.8",
+  "serial": 19,
+  "lineage": "09ca3124-cd4a-5a1a-c3d0-09c8cf0acd9a",
+  "outputs": {},
+  "resources": [
+    {
+      "mode": "managed",
+      "type": "terraform_data",
+      "name": "srv_dev_web_01",
+      "provider": "provider[\"terraform.io/builtin/terraform\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "id": "dd36ae43-e359-29d6-1ece-f930c79f0763",
+            "input": null,
+            "output": null,
+            "triggers_replace": {
+              "value": {
+                "template_id": "ubuntu-22.04",
+                "vm_name": "srv-dev-web-01"
+              },
+              "type": [
+                "object",
+                {
+                  "template_id": "string",
+                  "vm_name": "string"
+                }
+              ]
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0
+        }
+      ]
+    }
+  ],
+  "check_results": null
+}
