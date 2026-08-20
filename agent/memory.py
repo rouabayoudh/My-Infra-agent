@@ -1,4 +1,4 @@
-"""
+﻿"""
 memory.py — Mémoire persistante de l'agent via SQLite.
 
 Stocke :
@@ -53,6 +53,14 @@ class AgentMemory:
                     arguments   TEXT NOT NULL,
                     resultat    TEXT NOT NULL,
                     succes      INTEGER NOT NULL DEFAULT 1
+                );
+
+                CREATE TABLE IF NOT EXISTS logs (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp   TEXT NOT NULL,
+                    level       TEXT NOT NULL,
+                    source      TEXT NOT NULL,
+                    message     TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -195,6 +203,33 @@ class AgentMemory:
         lignes.append("=== END OF MEMORY ===")
         return "\n".join(lignes)
 
+    def log(self, level: str, source: str, message: str) -> None:
+        """Sauvegarde un log dans SQLite."""
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO logs (timestamp, level, source, message) VALUES (?, ?, ?, ?)",
+                (self._now(), level.upper(), source, message)
+            )
+
+    def get_logs(self, level: str = None, source: str = None, limit: int = 50) -> list:
+        """Retourne les logs filtrés par niveau et/ou source."""
+        query = "SELECT * FROM logs"
+        params = []
+        conditions = []
+        if level:
+            conditions.append("level = ?")
+            params.append(level.upper())
+        if source:
+            conditions.append("source LIKE ?")
+            params.append(f"%{source}%")
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
     def get_statistiques(self) -> dict:
         """Retourne des statistiques globales sur l'utilisation de l'agent."""
         with self._connect() as conn:
@@ -251,3 +286,5 @@ class AgentMemory:
         print(f"  Conversations    : {stats['conversations']}")
         print(f"  VMs actives      : {stats['vms_actives']}")
         print("=" * 60 + "\n")
+
+

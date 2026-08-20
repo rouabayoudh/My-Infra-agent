@@ -313,6 +313,22 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "query_logs",
+            "description": "Queries the SQLite log database. Can filter by level (INFO, ERROR, WARN) and source.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "level": {"type": "string", "description": "Log level filter: INFO, ERROR, WARN (optional)"},
+                    "source": {"type": "string", "description": "Source filter e.g. vmware_bridge (optional)"},
+                    "limit": {"type": "integer", "description": "Max number of logs to return (default 20)"}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "start_monitoring",
             "description": "Starts the infrastructure monitoring in the background. Checks VM states every 60 seconds and alerts on anomalies.",
             "parameters": {"type": "object", "properties": {}, "required": []}
@@ -561,6 +577,22 @@ def tool_save_yaml(servers_json: str) -> str:
 _monitoring_process = None
 
 
+def tool_query_logs(level: str = "", source: str = "", limit: int = 20) -> str:
+    print(f"\n  [TOOL] query_logs(level={level}, source={source})")
+    logs = memory.get_logs(
+        level=level if level else None,
+        source=source if source else None,
+        limit=limit
+    )
+    if not logs:
+        return "No logs found matching the criteria."
+    result = f"Found {len(logs)} log(s):\n"
+    for log in reversed(logs):
+        date = log["timestamp"][:19].replace("T", " ")
+        result += f"  [{date}] [{log["level"]}] [{log["source"]}] {log["message"]}\n"
+    return result
+
+
 def tool_start_monitoring() -> str:
     print(f"\n  [TOOL] start_monitoring()")
     global _monitoring_process
@@ -637,6 +669,7 @@ TOOL_DISPATCH = {
     "read_pdf":             lambda args: tool_read_pdf(**args),
     "analyze_and_extract":  lambda args: tool_analyze_and_extract(**args),
     "save_yaml":            lambda args: tool_save_yaml(**args),
+    "query_logs":            lambda args: tool_query_logs(**args),
     "start_monitoring":      lambda args: tool_start_monitoring(),
     "stop_monitoring":       lambda args: tool_stop_monitoring(),
     "monitoring_status":     lambda args: tool_monitoring_status(),
@@ -783,6 +816,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
 
 
 
