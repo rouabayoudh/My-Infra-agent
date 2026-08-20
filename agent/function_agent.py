@@ -313,6 +313,30 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "start_monitoring",
+            "description": "Starts the infrastructure monitoring in the background. Checks VM states every 60 seconds and alerts on anomalies.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "stop_monitoring",
+            "description": "Stops the infrastructure monitoring.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "monitoring_status",
+            "description": "Returns whether the monitoring is currently running or stopped.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "deploy_infrastructure",
             "description": "Generates Terraform from servers.yaml via LLM and runs terraform apply.",
             "parameters": {
@@ -533,6 +557,44 @@ def tool_save_yaml(servers_json: str) -> str:
         return f"[ERREUR] Could not save YAML: {e}"
 
 
+# Variable globale pour le process de monitoring
+_monitoring_process = None
+
+
+def tool_start_monitoring() -> str:
+    print(f"\n  [TOOL] start_monitoring()")
+    global _monitoring_process
+    if _monitoring_process and _monitoring_process.poll() is None:
+        return "Monitoring is already running."
+    monitor_path = os.path.join(BASE_DIR, "agent", "monitor.py")
+    if not os.path.exists(monitor_path):
+        return "[ERREUR] monitor.py not found."
+    _monitoring_process = subprocess.Popen(
+        [sys.executable, monitor_path],
+        cwd=BASE_DIR,
+        encoding="utf-8",
+    )
+    return f"[OK] Monitoring started (PID {_monitoring_process.pid}). Checking every 60 seconds."
+
+
+def tool_stop_monitoring() -> str:
+    print(f"\n  [TOOL] stop_monitoring()")
+    global _monitoring_process
+    if not _monitoring_process or _monitoring_process.poll() is not None:
+        return "Monitoring is not running."
+    _monitoring_process.terminate()
+    _monitoring_process = None
+    return "[OK] Monitoring stopped."
+
+
+def tool_monitoring_status() -> str:
+    print(f"\n  [TOOL] monitoring_status()")
+    global _monitoring_process
+    if _monitoring_process and _monitoring_process.poll() is None:
+        return f"Monitoring is RUNNING (PID {_monitoring_process.pid})."
+    return "Monitoring is STOPPED."
+
+
 def tool_deploy_infrastructure() -> str:
     print(f"\n  [TOOL] deploy_infrastructure()")
     result = subprocess.run(
@@ -575,6 +637,9 @@ TOOL_DISPATCH = {
     "read_pdf":             lambda args: tool_read_pdf(**args),
     "analyze_and_extract":  lambda args: tool_analyze_and_extract(**args),
     "save_yaml":            lambda args: tool_save_yaml(**args),
+    "start_monitoring":      lambda args: tool_start_monitoring(),
+    "stop_monitoring":       lambda args: tool_stop_monitoring(),
+    "monitoring_status":     lambda args: tool_monitoring_status(),
     "deploy_infrastructure": lambda args: tool_deploy_infrastructure(),
     "confirm_action":       lambda args: tool_confirm_action(**args),
 }
@@ -718,6 +783,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
 
 
 
