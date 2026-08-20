@@ -1,4 +1,4 @@
-"""
+﻿"""
 tf_runner.py — Orchestrateur principal du projet ai-infra-agent.
 
 Flux complet :
@@ -192,6 +192,26 @@ def executer_terraform(servers: list[dict]) -> None:
     # Si tous les serveurs sont à create (ou mixte)
     else:
         print("\n[INFO] Action : APPLY de l'infrastructure\n")
+        code = _run_terraform(["plan"])
+        if code != 0:
+            raise RuntimeError("terraform plan a echoue.")
+
+        print("\n" + "=" * 60)
+        print("  Plan affiche ci-dessus.")
+        print("  Voulez-vous appliquer ces changements ?")
+        print("  Tapez yes pour confirmer, autre chose pour annuler.")
+        print("=" * 60)
+
+        try:
+            reponse = input("  Votre decision : ").strip().lower()
+        except:
+            print("\n[INFO] Apply annule.")
+            return
+
+        if reponse != "yes":
+            print("\n[INFO] Apply annule par operateur.")
+            return
+
         code = _run_terraform(["apply", "-auto-approve"])
         if code != 0:
             raise RuntimeError("terraform apply a echoue.")
@@ -258,3 +278,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
