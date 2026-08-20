@@ -1,4 +1,4 @@
-"""
+﻿"""
 function_agent.py — Agent IA autonome avec function calling.
 
 Un seul point d'entrée pour toutes les opérations :
@@ -247,6 +247,14 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "list_templates",
+            "description": "Lists all available VM templates in the Templates directory.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "read_pdf",
             "description": "Extracts raw text from a PDF file. Returns the document content.",
             "parameters": {
@@ -400,6 +408,21 @@ def tool_revert_snapshot(vm_name: str, snapshot_name: str) -> str:
     return _appeler_bridge(["revert_snapshot", vm_name, snapshot_name])
 
 
+def tool_list_templates() -> str:
+    print(f"\n  [TOOL] list_templates()")
+    templates_dir = os.path.join("C:\\\\InfraAgent", "Templates")
+    if not os.path.exists(templates_dir):
+        return "[ERREUR] Templates directory not found : " + templates_dir
+    templates = []
+    for item in os.listdir(templates_dir):
+        vmx = os.path.join(templates_dir, item, item + ".vmx")
+        if os.path.exists(vmx):
+            templates.append(item)
+    if not templates:
+        return "No templates found in " + templates_dir
+    return "Available templates :\n" + "\n".join(f"  - {t}" for t in templates)
+
+
 def tool_read_pdf(pdf_path: str) -> str:
     print(f"\n  [TOOL] read_pdf({pdf_path})")
     chemin = os.path.join(BASE_DIR, pdf_path) if not os.path.isabs(pdf_path) else pdf_path
@@ -548,6 +571,7 @@ TOOL_DISPATCH = {
     "snapshot_vm":          lambda args: tool_snapshot_vm(**args),
     "list_snapshots":       lambda args: tool_list_snapshots(**args),
     "revert_snapshot":      lambda args: tool_revert_snapshot(**args),
+    "list_templates":       lambda args: tool_list_templates(),
     "read_pdf":             lambda args: tool_read_pdf(**args),
     "analyze_and_extract":  lambda args: tool_analyze_and_extract(**args),
     "save_yaml":            lambda args: tool_save_yaml(**args),
@@ -694,3 +718,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
