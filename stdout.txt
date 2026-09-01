@@ -1,0 +1,1 @@
+Error: The virtual machine is not powered on: C:\InfraAgent\VMs\srv-dev-web-01\srv-dev-web-01.vmx

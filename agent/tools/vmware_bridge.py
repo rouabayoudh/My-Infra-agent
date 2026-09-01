@@ -1,4 +1,4 @@
-﻿"""
+"""
 vmware_bridge.py — Passerelle entre Terraform (via local-exec) et
 VMware Workstation Pro.
 
@@ -32,12 +32,30 @@ from config import (
     INVENTORY_PATH,
     LOG_PATH,
 )
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+try:
+    from memory import AgentMemory as _AgentMemory
+    _mem = _AgentMemory()
+except Exception:
+    _mem = None
+
+def _log(level, message):
+    if _mem:
+        try:
+            _mem.log(level, "vmware_bridge", message)
+        except Exception:
+            pass
+
 from security import (
     SecurityError,
     validate_vm_name,
     safe_vm_path,
     safe_template_path,
 )
+
+
 
 # --- Logging ---
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -216,6 +234,7 @@ def create(template_id: str, vm_name: str) -> None:
         expected_state="running",
     )
 
+    _log("INFO", f"VM {vm_name} created from template {template_id}")
     print(f"[OK] VM '{vm_name}' créée et démarrée depuis le template '{template_id}'.")
 
 
@@ -246,11 +265,12 @@ def delete(vm_name: str) -> None:
         try:
             _run_vmrun(["stop", str(vmx_path), "hard"])
         except BridgeError as e:
-            logger.warning(f"stop hard aussi echoue: {e}")
+            pass
 
     # Suppression
     _run_vmrun(["deleteVM", str(vmx_path)])
     _remove_from_inventory(vm_name)
+    _log("INFO", f"VM {vm_name} deleted")
     print(f"[OK] VM '{vm_name}' arretee et supprimee.")
 
 def status(vm_name: str) -> str:
@@ -281,6 +301,7 @@ def start(vm_name: str) -> None:
         raise BridgeError(f"VM '{vm_name}' introuvable, impossible de démarrer.")
     _run_vmrun(["start", str(vmx_path), "nogui"])
     _update_inventory(vm_name, status="PoweredOn")
+    _log("INFO", f"VM {vm_name} started")
     print(f"[OK] VM '{vm_name}' démarrée.")
 
 
@@ -289,8 +310,18 @@ def stop(vm_name: str) -> None:
     vmx_path = safe_vm_path(vm_name)
     if not vmx_path.exists():
         raise BridgeError(f"VM '{vm_name}' introuvable, impossible d'arrêter.")
-    _run_vmrun(["stop", str(vmx_path), "soft"])
+    import shutil
+    for lck in vmx_path.parent.glob("*.lck"):
+        try:
+            shutil.rmtree(lck)
+        except Exception:
+            pass
+    try:
+        _run_vmrun(["stop", str(vmx_path), "soft"])
+    except BridgeError:
+        _run_vmrun(["stop", str(vmx_path), "hard"])
     _update_inventory(vm_name, status="PoweredOff")
+    _log("INFO", f"VM {vm_name} stopped")
     print(f"[OK] VM '{vm_name}' arrêtée.")
 
 def snapshot(vm_name: str, snapshot_name: str) -> None:
@@ -392,6 +423,7 @@ def main() -> int:
 
     except BridgeError as e:
         logger.error(f"BRIDGE ERROR: {e}")
+        _log("ERROR", f"[{command}] {e}")
         print(f"[ERREUR] Erreur: {e}", file=sys.stderr)
         return 1
 
